@@ -1,28 +1,58 @@
+# io/read_tensile.py
+from pathlib import Path
+from io import StringIO
+
 import pandas as pd
-import re
+
 
 def read_tensile(filepath):
     """
-    Reads an Instron tensile .txt file with metadata header and a table
-    beginning at the 'Extension' row.
+    Read raw tensile data exported by MTS from a .txt file.
+
+    The function searches for the line that contains the column header
+    (e.g. 'Crosshead' and 'Load') and uses that as the start of the data
+    table.
+
+    Parameters
+    ----------
+    filepath : str or Path
+        Path to the tensile .txt file.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame with at least the columns:
+        - 'crosshead' : extension (mm)
+        - 'load'      : load (N)
+        - 'time'      : time (s)  (if available)
     """
+    path = Path(filepath)
 
-    header_line = None
-    with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
-        for i, line in enumerate(f):
-            if line.strip().lower().startswith("extension"):
-                header_line = i
-                break
+    with path.open("r", encoding="utf-8", errors="ignore") as f:
+        lines = f.readlines()
 
-    if header_line is None:
-        raise ValueError("Could not find header row starting with 'Extension'.")
+    header_idx = None
+    for i, line in enumerate(lines):
+        if "Crosshead" in line and "Load" in line:
+            header_idx = i
+            break
 
+    if header_idx is None:
+        raise ValueError(
+            f"Could not find data header line in {filepath!s} "
+            "(expected a line containing 'Crosshead' and 'Load')."
+        )
+
+    data_str = "".join(lines[header_idx:])
     df = pd.read_csv(
-        filepath,
+        StringIO(data_str),
         delim_whitespace=True,
-        skiprows=header_line,
         engine="python"
     )
 
-    df.columns = df.columns.str.strip()
-    return df
+    df.columns = [c.strip().lower() for c in df.columns]
+
+    possible_cols = ["crosshead", "load", "time"]
+    keep = [c for c in possible_cols if c in df.columns]
+
+    return df[keep]

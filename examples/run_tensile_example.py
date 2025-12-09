@@ -1,23 +1,31 @@
+# examples/run_tensile_example.py
+from pathlib import Path
+
 from io.read_tensile import read_tensile
-from analysis.tensile import compute_stress_strain, youngs_modulus, tensile_properties
+from analysis.tensile import analyze_tensile
 from plots.tensile_plot import plot_stress_strain
-import matplotlib.pyplot as plt
 
-area = 2.23      # mm^2
-initial_length = 30.0  # mm
 
-df = read_tensile("10_8_2025_MEK_5%_Fabric.txt")
+def main():
+    here = Path(__file__).resolve().parent
+    data_file = here / "12_5_Tensile_MEK_1.25%_Bulk.txt"
 
-df = compute_stress_strain(df, area, initial_length)
+    # Change the number using real data：
+    area_mm2 = 2.23      # mm^2
+    initial_length_mm = 30.0  # mm
 
-E = youngs_modulus(df)
-uts, break_strain, toughness = tensile_properties(df)
+    df_raw = read_tensile(data_file)
+    result = analyze_tensile(df_raw, area_mm2, initial_length_mm)
 
-print("Modulus:", E)
-print("UTS:", uts)
-print("Break strain:", break_strain)
-print("Toughness:", toughness)
+    print("=== Tensile properties ===")
+    print(f"Young's modulus (MPa): {result.modulus:.2f}")
+    print(f"UTS (MPa):            {result.uts:.2f}")
+    print(f"Break strain (%):     {result.break_strain * 100:.2f}")
+    print(f"Toughness (MJ/m^3):   {result.toughness:.3f}")
 
-plot_stress_strain(df, label="MEK 5% Fabric")
-plt.legend()
-plt.show()
+    plot_stress_strain(result.data, label="MEK 1.25% Bulk")
+
+
+if __name__ == "__main__":
+    main()
+
