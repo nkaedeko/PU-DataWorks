@@ -1,5 +1,6 @@
 """
 Materials Testing Analyzer - Complete GUI Application
+
 """
 
 import tkinter as tk
@@ -72,6 +73,7 @@ class MaterialsAnalyzerApp:
         # Data storage
         self.tensile_data = {}
         self.tga_data = {}
+        self.dsc_data = {}
 
         self.setup_gui()
 
@@ -85,6 +87,7 @@ class MaterialsAnalyzerApp:
         self.create_home_tab()
         self.create_tensile_tab()
         self.create_tga_tab()
+        self.create_dsc_tab()
         self.create_results_tab()
 
     def create_home_tab(self):
@@ -137,6 +140,8 @@ class MaterialsAnalyzerApp:
                    command=lambda: self.notebook.select(1), width=20).pack(side='left', padx=10)
         ttk.Button(button_frame, text="Start TGA Analysis",
                    command=lambda: self.notebook.select(2), width=20).pack(side='left', padx=10)
+        ttk.Button(button_frame, text="Start DSC Analysis",
+                   command=lambda: self.notebook.select(3), width=20).pack(side='left', padx=10)
 
         # Version info
         version_label = tk.Label(home_frame, text="Version 1.0 | Developed for Materials Science Research",
@@ -253,6 +258,80 @@ class MaterialsAnalyzerApp:
         self.tga_plot_frame = ttk.LabelFrame(right_panel, text="Visualization", padding=10)
         self.tga_plot_frame.pack(fill='both', expand=True)
 
+    def create_dsc_tab(self):
+        """Create DSC analysis tab"""
+        dsc_frame = ttk.Frame(self.notebook)
+        self.notebook.add(dsc_frame, text=" DSC Analysis")
+
+        # Create left panel for controls
+        left_panel = ttk.Frame(dsc_frame, width=300)
+        left_panel.pack(side='left', fill='y', padx=10, pady=10)
+        left_panel.pack_propagate(False)
+
+        # File loading section
+        file_frame = ttk.LabelFrame(left_panel, text="File Loading", padding=10)
+        file_frame.pack(fill='x', pady=5)
+
+        ttk.Button(file_frame, text="Load DSC Files",
+                   command=self.load_dsc_files, width=25).pack(pady=3)
+
+        ttk.Button(file_frame, text="Load from Folder",
+                   command=self.load_dsc_folder, width=25).pack(pady=3)
+
+        ttk.Button(file_frame, text="Clear All Data",
+                   command=self.clear_dsc_data, width=25).pack(pady=3)
+
+        # Analysis parameters
+        params_frame = ttk.LabelFrame(left_panel, text="Analysis Parameters", padding=10)
+        params_frame.pack(fill='x', pady=5)
+
+        ttk.Label(params_frame, text="Heating Rate (°C/min):").pack(anchor='w')
+        self.heating_rate = tk.StringVar(value="20.0")
+        ttk.Entry(params_frame, textvariable=self.heating_rate, width=30).pack(pady=2, fill='x')
+
+        ttk.Label(params_frame, text="Temperature Range:").pack(anchor='w', pady=(10, 0))
+
+        temp_frame = ttk.Frame(params_frame)
+        temp_frame.pack(fill='x', pady=2)
+
+        ttk.Label(temp_frame, text="From:").pack(side='left')
+        self.temp_min = tk.StringVar(value="-90")
+        ttk.Entry(temp_frame, textvariable=self.temp_min, width=8).pack(side='left', padx=2)
+
+        ttk.Label(temp_frame, text="To:").pack(side='left')
+        self.temp_max = tk.StringVar(value="200")
+        ttk.Entry(temp_frame, textvariable=self.temp_max, width=8).pack(side='left', padx=2)
+
+        ttk.Label(temp_frame, text="(°C)").pack(side='left')
+
+        # Analysis controls
+        analysis_frame = ttk.LabelFrame(left_panel, text="Analysis Controls", padding=10)
+        analysis_frame.pack(fill='x', pady=5)
+
+        ttk.Button(analysis_frame, text="Analyze DSC Data",
+                   command=self.analyze_dsc_data, width=25).pack(pady=3)
+
+        ttk.Button(analysis_frame, text="Generate Plots",
+                   command=self.plot_dsc_data, width=25).pack(pady=3)
+
+        ttk.Button(analysis_frame, text="Export Results",
+                   command=self.export_dsc_results, width=25).pack(pady=3)
+
+        # Status section
+        status_frame = ttk.LabelFrame(left_panel, text="Status", padding=10)
+        status_frame.pack(fill='both', expand=True, pady=5)
+
+        self.dsc_status = scrolledtext.ScrolledText(status_frame, height=10, width=35, font=('Consolas', 9))
+        self.dsc_status.pack(fill='both', expand=True)
+
+        # Right panel for plots
+        right_panel = ttk.Frame(dsc_frame)
+        right_panel.pack(side='right', fill='both', expand=True, padx=10, pady=10)
+
+        # Plot area
+        self.dsc_plot_frame = ttk.LabelFrame(right_panel, text="Visualization", padding=10)
+        self.dsc_plot_frame.pack(fill='both', expand=True)
+
     def create_results_tab(self):
         """Create results display tab"""
         results_frame = ttk.Frame(self.notebook)
@@ -277,6 +356,14 @@ class MaterialsAnalyzerApp:
         self.tga_results_text = scrolledtext.ScrolledText(tga_results_frame,
                                                           font=('Courier', 10))
         self.tga_results_text.pack(fill='both', expand=True, padx=10, pady=10)
+
+        # DSC results
+        dsc_results_frame = ttk.Frame(results_notebook)
+        results_notebook.add(dsc_results_frame, text="DSC Results")
+
+        self.dsc_results_text = scrolledtext.ScrolledText(dsc_results_frame,
+                                                          font=('Courier', 10))
+        self.dsc_results_text.pack(fill='both', expand=True, padx=10, pady=10)
 
     # Utility Methods
     def log_status(self, text_widget, message):
@@ -997,6 +1084,569 @@ class MaterialsAnalyzerApp:
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to export: {e}")
 
+    # DSC Analysis Methods
+    def clear_dsc_data(self):
+        """Clear all DSC data"""
+        self.dsc_data = {}
+        self.dsc_status.delete(1.0, tk.END)
+        self.dsc_results_text.delete(1.0, tk.END)
+        for widget in self.dsc_plot_frame.winfo_children():
+            widget.destroy()
+        self.log_status(self.dsc_status, "All DSC data cleared")
+
+    def load_dsc_files(self):
+        """Load DSC files"""
+        files = filedialog.askopenfilenames(
+            title="Select DSC Files",
+            filetypes=[("CSV files", "*.csv"), ("Text files", "*.txt"), ("Excel files", "*.xlsx;*.xls"), ("All files", "*.*")]
+        )
+
+        if files:
+            self.process_dsc_files(files)
+
+    def load_dsc_folder(self):
+        """Load DSC files from folder"""
+        folder = filedialog.askdirectory(title="Select Folder with DSC Files")
+
+        if folder:
+            files = []
+            for ext in ['*.csv', '*.txt', '*.xlsx', '*.xls']:
+                files.extend(Path(folder).glob(ext))
+
+            if files:
+                self.process_dsc_files([str(f) for f in files])
+            else:
+                messagebox.showwarning("No Files", "No DSC files found in selected folder")
+
+    def process_dsc_files(self, files):
+        """Process DSC files"""
+
+        def process():
+            self.dsc_status.delete(1.0, tk.END)
+            self.log_status(self.dsc_status, f"Processing {len(files)} DSC files...")
+
+            success_count = 0
+
+            for filepath in files:
+                filename = Path(filepath).name
+                sample_name = self.extract_dsc_sample_name(filename)
+
+                self.log_status(self.dsc_status, f"\nProcessing: {filename}")
+                self.log_status(self.dsc_status, f"Sample: {sample_name}")
+
+                if self.load_single_dsc_file(filepath, sample_name):
+                    success_count += 1
+                    self.log_status(self.dsc_status, f"Successfully loaded")
+                else:
+                    self.log_status(self.dsc_status, f"Failed to load")
+
+            self.log_status(self.dsc_status, f"\nCompleted: {success_count}/{len(files)} files loaded")
+
+        threading.Thread(target=process, daemon=True).start()
+
+    def extract_dsc_sample_name(self, filename):
+        """Extract sample name from DSC filename"""
+        base_name = Path(filename).stem
+        parts = base_name.split('_')
+
+        sample_parts = []
+        for part in parts:
+            if 'dsc' in part.lower():
+                continue
+            elif 'mek' in part.lower():
+                sample_parts.append('MEK')
+            elif '%' in part:
+                sample_parts.append(part)
+            elif 'fabric' in part.lower():
+                sample_parts.append('Fabric')
+            elif 'bulk' in part.lower():
+                sample_parts.append('Bulk')
+            elif any(char.isdigit() for char in part) and len(part) <= 4:
+                continue  # Skip date/time parts
+            else:
+                sample_parts.append(part)
+
+        return '-'.join(sample_parts) if sample_parts else base_name
+
+    def load_single_dsc_file(self, filepath, sample_name):
+        """Load single DSC file - Select third ramp (-90 to 200°C)"""
+        try:
+            # Read all sheets
+            excel_file = pd.ExcelFile(filepath)
+            sheet_names = excel_file.sheet_names
+
+            self.log_status(self.dsc_status, f"  All sheets: {sheet_names}")
+
+            # Find the third ramp: from -90°C to 200°C (second heating)
+            target_sheet = None
+
+            # Method 1: Look for sheet with both "-90" and "200" (cooling then heating)
+            for sheet in sheet_names:
+                if "-90" in sheet and "200" in sheet:
+                    target_sheet = sheet
+                    self.log_status(self.dsc_status, f"  Found -90 to 200 sheet: {sheet}")
+                    break
+
+            # Method 2: If not found, look for the last sheet with "200" (usually the second heating)
+            if target_sheet is None:
+                heating_sheets = []
+                for sheet in sheet_names:
+                    if "200" in sheet:
+                        heating_sheets.append(sheet)
+
+                if len(heating_sheets) >= 2:
+                    target_sheet = heating_sheets[-1]  # Take the last heating ramp
+                    self.log_status(self.dsc_status, f"  Using last heating sheet: {target_sheet}")
+                elif len(heating_sheets) == 1:
+                    target_sheet = heating_sheets[0]
+                    self.log_status(self.dsc_status, f"  Using only heating sheet: {target_sheet}")
+
+            # Method 3: If still not found, try to find by index (usually 3rd sheet)
+            if target_sheet is None and len(sheet_names) >= 3:
+                target_sheet = sheet_names[2]  # Third sheet (index 2)
+                self.log_status(self.dsc_status, f"  Using third sheet by index: {target_sheet}")
+
+            # Fallback: use last sheet
+            if target_sheet is None:
+                target_sheet = sheet_names[-1]
+                self.log_status(self.dsc_status, f"  Fallback to last sheet: {target_sheet}")
+
+            # Read the target sheet
+            df = pd.read_excel(filepath, sheet_name=target_sheet)
+
+            self.log_status(self.dsc_status, f"  Sheet shape: {df.shape}")
+            self.log_status(self.dsc_status, f"  Columns: {list(df.columns)}")
+
+            # Extract data (assuming standard DSC format: Time, Temperature, Heat Flow)
+            if len(df.columns) >= 3:
+                time_col = df.columns[0]  # Time (min)
+                temp_col = df.columns[1]  # Temperature (°C)
+                heat_col = df.columns[2]  # Heat Flow (W/g)
+
+                self.log_status(self.dsc_status, f"  Data columns: {temp_col}, {heat_col}")
+
+                # Convert to numeric
+                temperature = pd.to_numeric(df[temp_col], errors='coerce').values
+                heat_flow = pd.to_numeric(df[heat_col], errors='coerce').values
+
+                # Remove NaN values
+                valid_mask = ~(np.isnan(temperature) | np.isnan(heat_flow))
+                temperature = temperature[valid_mask]
+                heat_flow = heat_flow[valid_mask]
+
+                if len(temperature) < 10:
+                    self.log_status(self.dsc_status, f"  Too few valid points: {len(temperature)}")
+                    return False
+
+                # Check temperature range to confirm we have the right data
+                temp_min, temp_max = temperature.min(), temperature.max()
+                self.log_status(self.dsc_status, f"  Temperature range: {temp_min:.1f} to {temp_max:.1f}°C")
+
+                # Verify this looks like the -90 to 200°C ramp
+                if temp_min > -50 or temp_max < 150:
+                    self.log_status(self.dsc_status,
+                                    f"  ⚠ Warning: Temperature range doesn't look like -90 to 200°C ramp")
+
+                # Show heat flow range
+                heat_min, heat_max = heat_flow.min(), heat_flow.max()
+                self.log_status(self.dsc_status, f"  Heat flow range: {heat_min:.4f} to {heat_max:.4f} W/g")
+
+                # Show sample data points at different temperatures
+                self.log_status(self.dsc_status, f"  Sample data points:")
+                temp_checkpoints = [-80, -40, 0, 40, 80, 120]
+                for checkpoint in temp_checkpoints:
+                    closest_idx = np.argmin(np.abs(temperature - checkpoint))
+                    actual_temp = temperature[closest_idx]
+                    actual_heat = heat_flow[closest_idx]
+                    self.log_status(self.dsc_status,
+                                    f"    ~{checkpoint}°C: T={actual_temp:.1f}°C, HF={actual_heat:.4f}")
+
+                # Sort by temperature for analysis
+                sort_idx = np.argsort(temperature)
+                temperature = temperature[sort_idx]
+                heat_flow = heat_flow[sort_idx]
+
+                # Calculate derivative
+                deriv_heat_flow = np.gradient(heat_flow, temperature)
+
+                # Analyze DSC data
+                results = self.analyze_dsc_thermal_events(temperature, heat_flow, deriv_heat_flow)
+
+                # Store data
+                self.dsc_data[sample_name] = {
+                    'temperature': temperature,
+                    'heat_flow': heat_flow,
+                    'deriv_heat_flow': deriv_heat_flow,
+                    'results': results,
+                    'filepath': filepath,
+                    'sheet_used': target_sheet
+                }
+
+                tg = results['Tg']
+                if not np.isnan(tg):
+                    self.log_status(self.dsc_status, f"  ✓ Tg detected: {tg:.1f}°C")
+                else:
+                    self.log_status(self.dsc_status, f"  ⚠ Tg not detected")
+
+                return True
+
+            else:
+                self.log_status(self.dsc_status, f"  ✗ Insufficient columns: {len(df.columns)}")
+                return False
+
+        except Exception as e:
+            self.log_status(self.dsc_status, f"  ✗ Error: {e}")
+            import traceback
+            self.log_status(self.dsc_status, f"  Traceback: {traceback.format_exc()}")
+            return False
+
+    def analyze_dsc_thermal_events(self, temperature, heat_flow, deriv_heat_flow):
+        """Improved Tg detection for polyurethane materials"""
+        results = {}
+
+        try:
+            # For polyurethane, Tg is typically between -60°C to +40°C
+            # Focus on this range for better detection
+            tg_search_min = -60
+            tg_search_max = 40
+
+            # Get user-defined range, but limit to reasonable Tg range
+            try:
+                user_min = float(self.temp_min.get())
+                user_max = float(self.temp_max.get())
+
+                # Use intersection of user range and typical Tg range
+                search_min = max(user_min, tg_search_min)
+                search_max = min(user_max, tg_search_max)
+            except:
+                search_min = tg_search_min
+                search_max = tg_search_max
+
+            # Focus on the Tg search range
+            mask = (temperature >= search_min) & (temperature <= search_max)
+            temp_range = temperature[mask]
+            heat_flow_range = heat_flow[mask]
+            deriv_range = deriv_heat_flow[mask]
+
+            self.log_status(self.dsc_status, f"    Tg search range: {search_min}°C to {search_max}°C")
+            self.log_status(self.dsc_status, f"    Data points in range: {len(temp_range)}")
+
+            if len(temp_range) < 10:
+                self.log_status(self.dsc_status, f"    Too few points in Tg range")
+                results['Tg'] = np.nan
+                return results
+
+            # Method 1: Midpoint method (most reliable for DSC)
+            try:
+                # Smooth the data to reduce noise
+                from scipy import ndimage
+                smoothed_heat_flow = ndimage.gaussian_filter1d(heat_flow_range, sigma=2)
+
+                # Find baseline regions (first 20% and last 20% of the range)
+                n_points = len(smoothed_heat_flow)
+                baseline_points = max(5, n_points // 5)
+
+                baseline_low = np.mean(smoothed_heat_flow[:baseline_points])
+                baseline_high = np.mean(smoothed_heat_flow[-baseline_points:])
+
+                # Midpoint value
+                midpoint_value = (baseline_low + baseline_high) / 2
+
+                # Find temperature closest to midpoint
+                midpoint_idx = np.argmin(np.abs(smoothed_heat_flow - midpoint_value))
+                tg_midpoint = temp_range[midpoint_idx]
+
+                self.log_status(self.dsc_status, f"    Midpoint method: {tg_midpoint:.1f}°C")
+
+            except ImportError:
+                # Fallback without scipy
+                n_points = len(heat_flow_range)
+                baseline_points = max(5, n_points // 5)
+
+                baseline_low = np.mean(heat_flow_range[:baseline_points])
+                baseline_high = np.mean(heat_flow_range[-baseline_points:])
+                midpoint_value = (baseline_low + baseline_high) / 2
+
+                midpoint_idx = np.argmin(np.abs(heat_flow_range - midpoint_value))
+                tg_midpoint = temp_range[midpoint_idx]
+
+            except Exception as e:
+                self.log_status(self.dsc_status, f"    Midpoint method failed: {e}")
+                tg_midpoint = np.nan
+
+            # Method 2: Inflection point (maximum slope change)
+            try:
+                # Find the steepest part of the transition
+                # Look for maximum absolute derivative in the middle region
+                middle_start = len(deriv_range) // 4
+                middle_end = 3 * len(deriv_range) // 4
+                middle_deriv = deriv_range[middle_start:middle_end]
+                middle_temp = temp_range[middle_start:middle_end]
+
+                if len(middle_deriv) > 0:
+                    # Find maximum positive derivative (steepest increase)
+                    max_deriv_idx = np.argmax(middle_deriv)
+                    tg_inflection = middle_temp[max_deriv_idx]
+
+                    self.log_status(self.dsc_status, f"    Inflection method: {tg_inflection:.1f}°C")
+                else:
+                    tg_inflection = np.nan
+
+            except Exception as e:
+                self.log_status(self.dsc_status, f"    Inflection method failed: {e}")
+                tg_inflection = np.nan
+
+            # Method 3: Onset method (intersection of baselines)
+            try:
+                # Find the onset temperature by baseline intersection
+                n_points = len(heat_flow_range)
+
+                # Fit line to first 30% of data (pre-transition baseline)
+                pre_end = n_points // 3
+                pre_temps = temp_range[:pre_end]
+                pre_heat = heat_flow_range[:pre_end]
+
+                if len(pre_temps) >= 3:
+                    pre_slope, pre_intercept = np.polyfit(pre_temps, pre_heat, 1)
+                else:
+                    pre_slope, pre_intercept = 0, np.mean(pre_heat)
+
+                # Fit line to steepest part (transition region)
+                trans_start = n_points // 3
+                trans_end = 2 * n_points // 3
+                trans_temps = temp_range[trans_start:trans_end]
+                trans_heat = heat_flow_range[trans_start:trans_end]
+
+                if len(trans_temps) >= 3:
+                    trans_slope, trans_intercept = np.polyfit(trans_temps, trans_heat, 1)
+
+                    # Find intersection (onset)
+                    if abs(trans_slope - pre_slope) > 1e-6:
+                        tg_onset = (trans_intercept - pre_intercept) / (pre_slope - trans_slope)
+
+                        # Check if onset is within reasonable range
+                        if search_min <= tg_onset <= search_max:
+                            self.log_status(self.dsc_status, f"    Onset method: {tg_onset:.1f}°C")
+                        else:
+                            tg_onset = np.nan
+                    else:
+                        tg_onset = np.nan
+                else:
+                    tg_onset = np.nan
+
+            except Exception as e:
+                self.log_status(self.dsc_status, f"    Onset method failed: {e}")
+                tg_onset = np.nan
+
+            # Choose the best Tg value
+            # Priority: midpoint > inflection > onset
+            if not np.isnan(tg_midpoint):
+                results['Tg'] = tg_midpoint
+                results['Tg_method'] = 'Midpoint'
+            elif not np.isnan(tg_inflection):
+                results['Tg'] = tg_inflection
+                results['Tg_method'] = 'Inflection'
+            elif not np.isnan(tg_onset):
+                results['Tg'] = tg_onset
+                results['Tg_method'] = 'Onset'
+            else:
+                results['Tg'] = np.nan
+                results['Tg_method'] = 'None'
+
+            # Store all methods for comparison
+            results['Tg_midpoint'] = tg_midpoint
+            results['Tg_inflection'] = tg_inflection
+            results['Tg_onset'] = tg_onset if 'tg_onset' in locals() else np.nan
+
+            # Store analysis parameters
+            results['search_min'] = search_min
+            results['search_max'] = search_max
+            results['onset_temp'] = temp_range[0]
+            results['end_temp'] = temp_range[-1]
+
+            final_tg = results['Tg']
+            method = results['Tg_method']
+            if not np.isnan(final_tg):
+                self.log_status(self.dsc_status, f"    ✓ Final Tg: {final_tg:.1f}°C ({method} method)")
+            else:
+                self.log_status(self.dsc_status, f"    ⚠ Tg not detected")
+
+        except Exception as e:
+            self.log_status(self.dsc_status, f"    ✗ Tg analysis error: {e}")
+            results['Tg'] = np.nan
+            results['Tg_method'] = 'Error'
+            results['Tg_midpoint'] = np.nan
+            results['Tg_inflection'] = np.nan
+            results['Tg_onset'] = np.nan
+
+        return results
+
+    def analyze_dsc_data(self):
+        """Analyze DSC data and display results"""
+        if not self.dsc_data:
+            messagebox.showwarning("No Data", "Please load DSC data first")
+            return
+
+        self.display_dsc_results()
+        self.log_status(self.dsc_status, "DSC analysis completed successfully")
+
+    def display_dsc_results(self):
+        """Display DSC analysis results"""
+        self.dsc_results_text.delete(1.0, tk.END)
+
+        output = "DSC ANALYSIS RESULTS\n"
+        output += "=" * 80 + "\n\n"
+
+        output += "Glass Transition Temperature (Tg) Summary\n"
+        output += "-" * 80 + "\n"
+        output += f"{'Sample':<25} {'Tg [°C]':<10} {'Method':<15} {'Temperature Range':<20}\n"
+        output += "-" * 80 + "\n"
+
+        for sample_name, data in self.dsc_data.items():
+            results = data['results']
+            sample = sample_name[:24]
+
+            tg = results['Tg']
+            tg_str = f"{tg:.1f}" if not np.isnan(tg) else "N/A"
+
+            method = "Inflection" if not np.isnan(results['Tg_inflection']) else "Midpoint"
+
+            temp_range = f"{results['onset_temp']:.0f} to {results['end_temp']:.0f}°C" if not np.isnan(
+                results['onset_temp']) else "N/A"
+
+            output += f"{sample:<25} {tg_str:<10} {method:<15} {temp_range:<20}\n"
+
+        output += "-" * 80 + "\n"
+        output += "Tg determined by inflection point method (maximum in derivative)\n"
+        output += "or midpoint method if inflection point is not available.\n"
+
+        self.dsc_results_text.insert(1.0, output)
+
+    def plot_dsc_data(self):
+        """Plot DSC data - Match manual format exactly"""
+        if not self.dsc_data:
+            messagebox.showwarning("No Data", "Please load DSC data first")
+            return
+
+        # Clear previous plot
+        for widget in self.dsc_plot_frame.winfo_children():
+            widget.destroy()
+
+        # Create plot matching your manual format
+        fig, ax = plt.subplots(1, 1, figsize=(10, 7))
+        fig.patch.set_facecolor('white')
+
+        # Colors matching your manual plot
+        colors = ['#000000', '#FF0000', '#0000FF', '#00AA00', '#FF00FF']  # Black, Red, Blue, Green, Magenta
+        line_styles = ['-', '--', '-.', ':', '--']
+
+        # Plot each sample
+        legend_labels = []
+        for i, (sample_name, data) in enumerate(self.dsc_data.items()):
+            color = colors[i % len(colors)]
+            line_style = line_styles[i % len(line_styles)]
+
+            # Extract percentage for legend (e.g., "0%", "1.25%", etc.)
+            if '%' in sample_name:
+                # Extract percentage from sample name
+                parts = sample_name.split('-')
+                for part in parts:
+                    if '%' in part:
+                        legend_label = part
+                        break
+                else:
+                    legend_label = sample_name
+            else:
+                legend_label = sample_name
+
+            # Plot the curve
+            ax.plot(data['temperature'], data['heat_flow'],
+                    color=color, linestyle=line_style, linewidth=2.0,
+                    label=legend_label, alpha=0.9)
+
+            legend_labels.append(legend_label)
+
+        # Set the exact formatting to match your manual plot
+        ax.set_xlabel('Temperature (°C)', fontsize=12)
+        ax.set_ylabel('Heat Flow (Normalized) (W/g)', fontsize=12)
+        ax.set_title('MEK-Si-Bulk DSC', fontsize=14, fontweight='bold')
+
+        # Set axis ranges to match your manual plot
+        ax.set_xlim(-100, 200)
+        ax.set_ylim(-0.7, 0.1)  # Match your manual plot Y-range
+
+        # Add grid
+        ax.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
+
+        # Legend formatting to match manual plot
+        legend = ax.legend(fontsize=10, frameon=True, loc='upper left',
+                           bbox_to_anchor=(0.02, 0.98))
+        legend.get_frame().set_facecolor('white')
+        legend.get_frame().set_edgecolor('black')
+        legend.get_frame().set_linewidth(1)
+
+        # Axis formatting
+        ax.tick_params(labelsize=10)
+        for spine in ax.spines.values():
+            spine.set_linewidth(1)
+            spine.set_color('black')
+
+        # Remove Tg annotations for cleaner look (like your manual plot)
+
+        plt.tight_layout()
+
+        # Embed in GUI
+        canvas = FigureCanvasTkAgg(fig, self.dsc_plot_frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill='both', expand=True)
+
+        self.log_status(self.dsc_status, "DSC plot generated (manual format)")
+
+    def export_dsc_results(self):
+        """Export DSC results to Excel"""
+        if not self.dsc_data:
+            messagebox.showwarning("No Data", "Please analyze DSC data first")
+            return
+
+        filename = filedialog.asksaveasfilename(
+            title="Save DSC Results",
+            defaultextension=".xlsx",
+            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")]
+        )
+
+        if filename:
+            try:
+                with pd.ExcelWriter(filename, engine='openpyxl') as writer:
+                    # Summary table
+                    summary_data = []
+                    for sample_name, data in self.dsc_data.items():
+                        results = data['results']
+                        summary_data.append({
+                            'Sample': sample_name,
+                            'Tg_C': results['Tg'],
+                            'Tg_Inflection_C': results['Tg_inflection'],
+                            'Tg_Midpoint_C': results['Tg_midpoint'],
+                            'Onset_Temp_C': results['onset_temp'],
+                            'End_Temp_C': results['end_temp']
+                        })
+
+                    pd.DataFrame(summary_data).to_excel(writer, sheet_name='DSC_Summary', index=False)
+
+                    # Raw data for each sample
+                    for sample_name, data in self.dsc_data.items():
+                        df_raw = pd.DataFrame({
+                            'Temperature_C': data['temperature'],
+                            'Heat_Flow_mW_per_mg': data['heat_flow'],
+                            'Deriv_Heat_Flow': data['deriv_heat_flow']
+                        })
+
+                        sheet_name = sample_name.replace(' ', '_').replace('%', 'pct')[:31]
+                        df_raw.to_excel(writer, sheet_name=sheet_name, index=False)
+
+                messagebox.showinfo("Success", f"DSC results exported to {filename}")
+                self.log_status(self.dsc_status, f"Results exported to {Path(filename).name}")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to export: {e}")
 
 def main():
     """Main function to run the application"""
