@@ -117,6 +117,12 @@ class MaterialsAnalyzerApp:
           - T5, T50, Tmax calculations
           - Weight loss and derivative curves
           - Multi-sample comparison
+        
+        • DSC (Differential Scanning Calorimetry) Data
+          - Glass transition temperature (Tg) analysis
+          - Heat flow and derivative curves
+          - Inflection point and midpoint methods
+          - Thermal transition characterization   
 
         Features:
         ✓ Easy file loading with intuitive interface
