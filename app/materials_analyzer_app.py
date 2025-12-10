@@ -1,6 +1,5 @@
 """
 Materials Testing Analyzer - Complete GUI Application
-材料测试分析器 - 完整图形用户界面应用
 """
 
 import tkinter as tk
