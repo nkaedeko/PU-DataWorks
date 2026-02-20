@@ -28,6 +28,11 @@ Currently supported modules:
 - Real-time status and error logging
 - Designed for non-programmers
 
+### 🆕 Average Curve Export
+- **Multi-file averaging** with automatic interpolation alignment
+- Generates representative curves from multiple measurements
+- Maintains original data format for seamless re-import
+- Available for all testing modules (Tensile, TGA, DSC)
 ---
 
 ## Tensile Testing Module
