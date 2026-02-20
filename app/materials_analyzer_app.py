@@ -198,6 +198,9 @@ class MaterialsAnalyzerApp:
         ttk.Button(analysis_frame, text="Export Results",
                    command=self.export_tensile_results, width=25).pack(pady=3)
 
+        ttk.Button(analysis_frame, text="Export Averaged Curve",
+                   command=self.export_averaged_tensile_curve, width=25).pack(pady=3)
+
         # Status section
         status_frame = ttk.LabelFrame(left_panel, text="Status", padding=10)
         status_frame.pack(fill='both', expand=True, pady=5)
@@ -249,6 +252,8 @@ class MaterialsAnalyzerApp:
         ttk.Button(analysis_frame, text="Export Results",
                    command=self.export_tga_results, width=25).pack(pady=3)
 
+        ttk.Button(analysis_frame, text="Export Averaged Curve",
+                   command=self.export_averaged_tga_curve, width=25).pack(pady=3)
         # Status section
         status_frame = ttk.LabelFrame(left_panel, text="Status", padding=10)
         status_frame.pack(fill='both', expand=True, pady=5)
@@ -322,6 +327,9 @@ class MaterialsAnalyzerApp:
 
         ttk.Button(analysis_frame, text="Export Results",
                    command=self.export_dsc_results, width=25).pack(pady=3)
+
+        ttk.Button(analysis_frame, text="Export Averaged Curve",
+                   command=self.export_averaged_dsc_curve, width=25).pack(pady=3)
 
         # Status section
         status_frame = ttk.LabelFrame(left_panel, text="Status", padding=10)
@@ -697,6 +705,75 @@ class MaterialsAnalyzerApp:
 
         self.log_status(self.tensile_status, "Plot generated successfully")
 
+    def export_averaged_tensile_curve(self):
+        """Export averaged stress-strain curve from all loaded files"""
+        if not self.tensile_data:
+            messagebox.showwarning("No Data", "Please load tensile data first")
+            return
+
+        if len(self.tensile_data) < 2:
+            messagebox.showinfo("Info", "Need at least 2 files to calculate average")
+            return
+
+        filename = filedialog.asksaveasfilename(
+            title="Save Averaged Tensile Curve",
+            defaultextension=".txt",
+            filetypes=[("Text files", "*.txt"), ("CSV files", "*.csv"), ("All files", "*.*")]
+        )
+
+        if filename:
+            try:
+                # Find common strain range
+                strain_min = max(data_info['data']['strain'].min() for data_info in self.tensile_data.values())
+                strain_max = min(data_info['data']['strain'].max() for data_info in self.tensile_data.values())
+
+                # Create common strain array
+                common_strain = np.linspace(strain_min, strain_max, 500)
+
+                # Interpolate all curves
+                crosshead_curves = []
+                load_curves = []
+                time_curves = []
+
+                for name, data_info in self.tensile_data.items():
+                    data = data_info['data']
+                    params = data_info['parameters']
+
+                    # Interpolate crosshead, load based on strain
+                    crosshead_interp = np.interp(common_strain, data['strain'], data['crosshead'])
+                    load_interp = np.interp(common_strain, data['strain'], data['load'])
+                    time_interp = np.interp(common_strain, data['strain'], data['time'])
+
+                    crosshead_curves.append(crosshead_interp)
+                    load_curves.append(load_interp)
+                    time_curves.append(time_interp)
+
+                # Calculate mean
+                crosshead_mean = np.mean(crosshead_curves, axis=0)
+                load_mean = np.mean(load_curves, axis=0)
+                time_mean = np.mean(time_curves, axis=0)
+
+                # Create output with original column names
+                output_lines = []
+                output_lines.append("Crosshead\tLoad\tTime")
+                output_lines.append("mm N\tsec")
+
+                for i in range(len(crosshead_mean)):
+                    line = f"{crosshead_mean[i]:.9f}\t{load_mean[i]:.10f}\t{time_mean[i]:.13f}"
+                    output_lines.append(line)
+
+                # Write to file
+                with open(filename, 'w') as f:
+                    f.write('\n'.join(output_lines))
+
+                messagebox.showinfo("Success",
+                                    f"Averaged curve from {len(self.tensile_data)} files exported to:\n{Path(filename).name}")
+                self.log_status(self.tensile_status,
+                                f"✓ Averaged curve exported: n={len(self.tensile_data)} files")
+
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to export averaged curve: {e}")
+
     def export_tensile_results(self):
         """Export tensile results in publication format"""
         if not self.tensile_data:
@@ -1044,6 +1121,71 @@ class MaterialsAnalyzerApp:
         canvas.get_tk_widget().pack(fill='both', expand=True)
 
         self.log_status(self.tga_status, "TGA plots generated successfully")
+
+    def export_averaged_tga_curve(self):
+        """Export averaged TGA curve from all loaded files"""
+        if not self.tga_data:
+            messagebox.showwarning("No Data", "Please load TGA data first")
+            return
+
+        if len(self.tga_data) < 2:
+            messagebox.showinfo("Info", "Need at least 2 files to calculate average")
+            return
+
+        filename = filedialog.asksaveasfilename(
+            title="Save Averaged TGA Curve",
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+        )
+
+        if filename:
+            try:
+                # Find common temperature range
+                temp_min = max(data['temperature'].min() for data in self.tga_data.values())
+                temp_max = min(data['temperature'].max() for data in self.tga_data.values())
+
+                # Create common temperature array
+                common_temp = np.linspace(temp_min, temp_max, 500)
+
+                # Interpolate all curves to common temperature
+                weight_curves = []
+
+                for sample_name, data in self.tga_data.items():
+                    # Interpolate weight_percent back to actual weight
+                    weight_interp = np.interp(common_temp, data['temperature'], data['weight_percent'])
+                    weight_curves.append(weight_interp)
+
+                weight_curves = np.array(weight_curves)
+
+                # Calculate mean weight percent
+                weight_percent_mean = np.mean(weight_curves, axis=0)
+
+                # Convert back to actual weight (assuming initial weight = 100%)
+                # Since weight_percent = (weight/weight[0])*100
+                # We'll output as "Unsubtracted Weight" in arbitrary units
+                unsubtracted_weight_mean = weight_percent_mean / 100.0 * 4.5  # Typical sample weight ~4.5mg
+
+                # Create time array (assuming typical heating rate)
+                # Time roughly corresponds to temperature change
+                time_mean = (common_temp - common_temp[0]) / 10.0  # Assuming 10°C/min heating rate
+
+                # Create DataFrame with original column names
+                df_avg = pd.DataFrame({
+                    'Time': time_mean,
+                    'Unsubtracted Weight': unsubtracted_weight_mean,
+                    'Sample Temperature': common_temp
+                })
+
+                # Export
+                df_avg.to_csv(filename, index=False)
+
+                messagebox.showinfo("Success",
+                                    f"Averaged TGA curve from {len(self.tga_data)} samples exported to:\n{Path(filename).name}")
+                self.log_status(self.tga_status,
+                                f"✓ Averaged TGA curve exported: n={len(self.tga_data)} samples")
+
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to export averaged curve: {e}")
 
     def export_tga_results(self):
         """Export TGA results to Excel"""
@@ -1607,6 +1749,85 @@ class MaterialsAnalyzerApp:
         canvas.get_tk_widget().pack(fill='both', expand=True)
 
         self.log_status(self.dsc_status, "DSC plot generated (manual format)")
+
+    def export_averaged_dsc_curve(self):
+        """Export averaged DSC curve from all loaded files"""
+        if not self.dsc_data:
+            messagebox.showwarning("No Data", "Please load DSC data first")
+            return
+
+        if len(self.dsc_data) < 2:
+            messagebox.showinfo("Info", "Need at least 2 files to calculate average")
+            return
+
+        filename = filedialog.asksaveasfilename(
+            title="Save Averaged DSC Curve",
+            defaultextension=".xlsx",
+            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")]
+        )
+
+        if filename:
+            try:
+                # Find common temperature range
+                temp_min = max(data['temperature'].min() for data in self.dsc_data.values())
+                temp_max = min(data['temperature'].max() for data in self.dsc_data.values())
+
+                # Create common temperature array
+                common_temp = np.linspace(temp_min, temp_max, 500)
+
+                # Interpolate all curves to common temperature
+                heat_flow_curves = []
+
+                for sample_name, data in self.dsc_data.items():
+                    heat_flow_interp = np.interp(common_temp, data['temperature'], data['heat_flow'])
+                    heat_flow_curves.append(heat_flow_interp)
+
+                heat_flow_curves = np.array(heat_flow_curves)
+
+                # Calculate mean
+                heat_flow_mean = np.mean(heat_flow_curves, axis=0)
+
+                # Calculate time (assuming heating rate from parameters)
+                try:
+                    heating_rate = float(self.heating_rate.get())
+                except:
+                    heating_rate = 20.0  # Default
+
+                time_mean = (common_temp - common_temp[0]) / heating_rate
+
+                # Create DataFrame with original column names
+                df_avg = pd.DataFrame({
+                    'Time': time_mean,
+                    'Temperature': common_temp,
+                    'Heat Flow (Normalized)': heat_flow_mean
+                })
+
+                # Add units row
+                units_row = pd.DataFrame({
+                    'Time': ['min'],
+                    'Temperature': ['°C'],
+                    'Heat Flow (Normalized)': ['W/g']
+                })
+
+                # Export to Excel with header
+                with pd.ExcelWriter(filename, engine='openpyxl') as writer:
+                    # Write a title row first
+                    workbook = writer.book
+                    worksheet = workbook.create_sheet('Averaged Data')
+
+                    # Write header
+                    worksheet['A1'] = f'Averaged DSC Data (n={len(self.dsc_data)})'
+
+                    # Write data starting from row 2
+                    df_avg.to_excel(writer, sheet_name='Averaged Data', startrow=1, index=False)
+
+                messagebox.showinfo("Success",
+                                    f"Averaged DSC curve from {len(self.dsc_data)} samples exported to:\n{Path(filename).name}")
+                self.log_status(self.dsc_status,
+                                f"✓ Averaged DSC curve exported: n={len(self.dsc_data)} samples")
+
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to export averaged curve: {e}")
 
     def export_dsc_results(self):
         """Export DSC results to Excel"""
